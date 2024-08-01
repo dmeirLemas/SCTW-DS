@@ -32,7 +32,7 @@ class ProgressBar {
       padding += " ";
     }
 
-    string ending = current == total ? "\n\n" + message + "\n\n" : "\r";
+    string ending = current == total ? "\n\n" + message + "\x1b[0m\n\n" : "\r";
     string completed = current == total ? "\x1b[32m" : "\x1b[0m";
 
     cout << completed << "Progress: [" << arrow << padding << "] "

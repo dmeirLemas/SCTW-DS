@@ -12,8 +12,9 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
       num_out_nodes(out_nodes),
       activation_func(activation_func),
       cost_func(cost_func) {
-  weights.resize(num_in_nodes, std::vector<double>(num_out_nodes));
-  biases.resize(num_out_nodes);
+  weights = Eigen::MatrixXd::Random(num_in_nodes, num_out_nodes);
+  biases = Eigen::VectorXd::Random(num_out_nodes);
+
   cost_map["mse"] = std::bind(&FullyConnectedLayer::mse, this,
                               std::placeholders::_1, std::placeholders::_2);
   cost_map["cross_entropy"] =
@@ -75,150 +76,79 @@ void FullyConnectedLayer::setFunctions(const std::string& cost_func,
 }
 
 // Calculate outputs method
-std::pair<std::vector<double>, std::vector<double>>
-FullyConnectedLayer::calculateOutputs(const std::vector<double>& inputs) {
-  std::vector<double> outputs(num_out_nodes, 0.0);
-
-  // Calculate the dot product of inputs and weights, then add biases
-  for (int i = 0; i < num_out_nodes; ++i) {
-    for (int j = 0; j < num_in_nodes; ++j) {
-      outputs[i] += inputs[j] * weights[j][i];
-    }
-    outputs[i] += biases[i];
-  }
-  return {outputs, activationFunction(outputs)};
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+FullyConnectedLayer::calculateOutputs(const Eigen::VectorXd& inputs) {
+  Eigen::VectorXd z = weights.transpose() * inputs + biases;
+  Eigen::VectorXd activation = activationFunction(z);
+  return {z, activation};
 }
 
 // Function Implementations
-double FullyConnectedLayer::mse(const std::vector<double>& y_true,
-                                const std::vector<double>& y_pred) {
-  double sum = 0.0;
-  for (size_t i = 0; i < y_true.size(); ++i) {
-    sum += std::pow(y_true[i] - y_pred[i], 2);
-  }
-  return sum / y_true.size();
+double FullyConnectedLayer::mse(const Eigen::VectorXd& y_true,
+                                const Eigen::VectorXd& y_pred) {
+  return (y_true - y_pred).squaredNorm() / y_true.size();
 }
 
-double FullyConnectedLayer::cross_entropy(const std::vector<double>& y_true,
-                                          const std::vector<double>& y_pred) {
-  double sum = 0.0;
-  for (size_t i = 0; i < y_true.size(); ++i) {
-    sum += -y_true[i] * std::log(y_pred[i]) -
-           (1 - y_true[i]) * std::log(1 - y_pred[i]);
-  }
-  return sum / y_true.size();
+double FullyConnectedLayer::cross_entropy(const Eigen::VectorXd& y_true,
+                                          const Eigen::VectorXd& y_pred) {
+  return -(y_true.array() * y_pred.array().log() +
+           (1 - y_true.array()) * (1 - y_pred.array()).log())
+              .mean();
 }
 
-std::vector<double> FullyConnectedLayer::mseDerivative(
-    const std::vector<double>& y_true, const std::vector<double>& y_pred) {
-  std::vector<double> result(y_true.size());
-  for (size_t i = 0; i < y_true.size(); ++i) {
-    result[i] = 2 * (y_pred[i] - y_true[i]) / y_true.size();
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::mseDerivative(
+    const Eigen::VectorXd& y_true, const Eigen::VectorXd& y_pred) {
+  return 2 * (y_pred - y_true) / y_true.size();
 }
 
-std::vector<double> FullyConnectedLayer::cross_entropyDerivative(
-    const std::vector<double>& y_true, const std::vector<double>& y_pred) {
-  std::vector<double> result(y_true.size());
-  for (size_t i = 0; i < y_true.size(); ++i) {
-    result[i] = (y_pred[i] - y_true[i]) / (y_pred[i] * (1 - y_pred[i]));
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::cross_entropyDerivative(
+    const Eigen::VectorXd& y_true, const Eigen::VectorXd& y_pred) {
+  return (y_pred - y_true).array() / (y_pred.array() * (1 - y_pred.array()));
 }
 
-std::vector<double> FullyConnectedLayer::sigmoid(const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = 1 / (1 + std::exp(-x[i]));
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::sigmoid(const Eigen::VectorXd& x) {
+  return 1 / (1 + (-x.array()).exp());
 }
 
-std::vector<double> FullyConnectedLayer::relu(const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = std::max(0.0, x[i]);
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::relu(const Eigen::VectorXd& x) {
+  return x.array().max(0);
 }
 
-std::vector<double> FullyConnectedLayer::leaky_relu(
-    const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = (x[i] > 0) ? x[i] : 0.01 * x[i];
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::leaky_relu(const Eigen::VectorXd& x) {
+  return x.array().max(0) + 0.01 * x.array().min(0);
 }
 
-std::vector<double> FullyConnectedLayer::tanh(const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = std::tanh(x[i]);
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::tanh(const Eigen::VectorXd& x) {
+  return x.array().tanh();
 }
 
-std::vector<double> FullyConnectedLayer::softmax(const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  double max = *std::max_element(x.begin(), x.end());
-  double sum = 0.0;
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = std::exp(x[i] - max);
-    sum += result[i];
-  }
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] /= sum;
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::softmax(const Eigen::VectorXd& x) {
+  Eigen::VectorXd exp_x = (x.array() - x.maxCoeff()).exp();
+  return exp_x / exp_x.sum();
 }
 
-std::vector<double> FullyConnectedLayer::sigmoid_derivative(
-    const std::vector<double>& x) {
-  std::vector<double> sigmoid_vals = sigmoid(x);
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = sigmoid_vals[i] * (1 - sigmoid_vals[i]);
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::sigmoid_derivative(
+    const Eigen::VectorXd& x) {
+  Eigen::VectorXd sig = sigmoid(x);
+  return sig.array() * (1 - sig.array());
 }
 
-std::vector<double> FullyConnectedLayer::relu_derivative(
-    const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = (x[i] > 0) ? 1.0 : 0.0;
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::relu_derivative(const Eigen::VectorXd& x) {
+  return (x.array() > 0).cast<double>();
 }
 
-std::vector<double> FullyConnectedLayer::leaky_relu_derivative(
-    const std::vector<double>& x) {
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = (x[i] > 0) ? 1.0 : 0.01;
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::leaky_relu_derivative(
+    const Eigen::VectorXd& x) {
+  return (x.array() > 0).cast<double>() +
+         0.01 * (x.array() <= 0).cast<double>();
 }
 
-std::vector<double> FullyConnectedLayer::tanh_derivative(
-    const std::vector<double>& x) {
-  std::vector<double> tanh_vals = tanh(x);
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = 1 - std::pow(tanh_vals[i], 2);
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::tanh_derivative(const Eigen::VectorXd& x) {
+  return 1 - tanh(x).array().square();
 }
 
-std::vector<double> FullyConnectedLayer::softmax_derivative(
-    const std::vector<double>& x) {
-  // This is a simplified version of the derivative for illustrative purposes
-  std::vector<double> softmax_vals = softmax(x);
-  std::vector<double> result(x.size());
-  for (size_t i = 0; i < x.size(); ++i) {
-    result[i] = softmax_vals[i] * (1 - softmax_vals[i]);
-  }
-  return result;
+Eigen::VectorXd FullyConnectedLayer::softmax_derivative(
+    const Eigen::VectorXd& x) {
+  Eigen::VectorXd soft = softmax(x);
+  return soft.array() * (1 - soft.array());
 }

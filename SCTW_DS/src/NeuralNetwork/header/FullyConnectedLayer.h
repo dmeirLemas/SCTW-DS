@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../../Eigen/Dense"
+
 class FullyConnectedLayer {
  private:
   // Shapes
@@ -17,40 +19,39 @@ class FullyConnectedLayer {
   std::string cost_func;
 
   // Cost Functions
-  double mse(const std::vector<double>& y_true,
-             const std::vector<double>& y_pred);
-  double cross_entropy(const std::vector<double>& y_true,
-                       const std::vector<double>& y_pred);
+  double mse(const Eigen::VectorXd& y_true, const Eigen::VectorXd& y_pred);
+  double cross_entropy(const Eigen::VectorXd& y_true,
+                       const Eigen::VectorXd& y_pred);
 
   // Cost Function Derivatives
-  std::vector<double> mseDerivative(const std::vector<double>& y_true,
-                                    const std::vector<double>& y_pred);
-  std::vector<double> cross_entropyDerivative(
-      const std::vector<double>& y_true, const std::vector<double>& y_pred);
+  Eigen::VectorXd mseDerivative(const Eigen::VectorXd& y_true,
+                                const Eigen::VectorXd& y_pred);
+  Eigen::VectorXd cross_entropyDerivative(const Eigen::VectorXd& y_true,
+                                          const Eigen::VectorXd& y_pred);
 
   // Activation Functions
-  std::vector<double> sigmoid(const std::vector<double>& x);
-  std::vector<double> relu(const std::vector<double>& x);
-  std::vector<double> leaky_relu(const std::vector<double>& x);
-  std::vector<double> tanh(const std::vector<double>& x);
-  std::vector<double> softmax(const std::vector<double>& x);
+  Eigen::VectorXd sigmoid(const Eigen::VectorXd& x);
+  Eigen::VectorXd relu(const Eigen::VectorXd& x);
+  Eigen::VectorXd leaky_relu(const Eigen::VectorXd& x);
+  Eigen::VectorXd tanh(const Eigen::VectorXd& x);
+  Eigen::VectorXd softmax(const Eigen::VectorXd& x);
 
   // Activation Function Derivatives
-  std::vector<double> sigmoid_derivative(const std::vector<double>& x);
-  std::vector<double> relu_derivative(const std::vector<double>& x);
-  std::vector<double> leaky_relu_derivative(const std::vector<double>& x);
-  std::vector<double> tanh_derivative(const std::vector<double>& x);
-  std::vector<double> softmax_derivative(const std::vector<double>& x);
+  Eigen::VectorXd sigmoid_derivative(const Eigen::VectorXd& x);
+  Eigen::VectorXd relu_derivative(const Eigen::VectorXd& x);
+  Eigen::VectorXd leaky_relu_derivative(const Eigen::VectorXd& x);
+  Eigen::VectorXd tanh_derivative(const Eigen::VectorXd& x);
+  Eigen::VectorXd softmax_derivative(const Eigen::VectorXd& x);
 
   // Necessary Internal Function Definitions For Ease
-  using CostFunction = std::function<double(const std::vector<double>&,
-                                            const std::vector<double>&)>;
+  using CostFunction =
+      std::function<double(const Eigen::VectorXd&, const Eigen::VectorXd&)>;
   using ActivationFunction =
-      std::function<std::vector<double>(const std::vector<double>&)>;
-  using DerivativeCostFunction = std::function<std::vector<double>(
-      const std::vector<double>&, const std::vector<double>&)>;
+      std::function<Eigen::VectorXd(const Eigen::VectorXd&)>;
+  using DerivativeCostFunction = std::function<Eigen::VectorXd(
+      const Eigen::VectorXd&, const Eigen::VectorXd&)>;
   using DerivativeActivationFunction =
-      std::function<std::vector<double>(const std::vector<double>&)>;
+      std::function<Eigen::VectorXd(const Eigen::VectorXd&)>;
 
   // Maps
   std::unordered_map<std::string, CostFunction> cost_map;
@@ -67,8 +68,8 @@ class FullyConnectedLayer {
                       const std::string& activation_func,
                       const std::string& cost_func);
   // weights and biases
-  std::vector<std::vector<double>> weights;
-  std::vector<double> biases;
+  Eigen::MatrixXd weights;
+  Eigen::VectorXd biases;
 
   CostFunction costFunction;
   ActivationFunction activationFunction;
@@ -76,8 +77,8 @@ class FullyConnectedLayer {
   DerivativeActivationFunction derivativeActivationFunction;
 
   // Methods
-  std::pair<std::vector<double>, std::vector<double>> calculateOutputs(
-      const std::vector<double>& inputs);
+  std::pair<Eigen::VectorXd, Eigen::VectorXd> calculateOutputs(
+      const Eigen::VectorXd& inputs);
 };
 
-#endif  // !LAYERS_H
+#endif  // LAYERS_H
