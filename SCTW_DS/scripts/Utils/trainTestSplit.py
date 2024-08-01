@@ -30,7 +30,6 @@ def process_chunk(
         with lock:
             p.increment()
 
-    # Convert list of tuples to a structured numpy array
     data_points = np.array(data_points, dtype=object)
     return data_points
 
@@ -58,4 +57,11 @@ def trainTestSplit(
     train_data = data_points[: int(ratio * len(data_points))]
     test_data = data_points[int(ratio * len(data_points)) :]
 
-    return np.array(train_data), np.array(test_data)
+    for i in range(len(test_data)):
+        # Flatten the expected_outputs for test data and wrap in np.array
+        test_data[i] = (
+            test_data[i][0],
+            np.array(float(np.where(test_data[i][1] == 1.0)[0][0])),
+        )
+
+    return np.array(train_data, dtype=object), np.array(test_data, dtype=object)

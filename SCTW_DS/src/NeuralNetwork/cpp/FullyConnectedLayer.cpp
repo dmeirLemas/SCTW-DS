@@ -1,7 +1,9 @@
+#include "../header/FullyConnectedLayer.h"
+
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <vector>
-
-#include "../header/Layers.h"
 
 FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
                                          const std::string& activation_func,
@@ -10,7 +12,7 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
       num_out_nodes(out_nodes),
       activation_func(activation_func),
       cost_func(cost_func) {
-  weights.resize(num_out_nodes, std::vector<double>(num_in_nodes));
+  weights.resize(num_in_nodes, std::vector<double>(num_out_nodes));
   biases.resize(num_out_nodes);
   cost_map["mse"] = std::bind(&FullyConnectedLayer::mse, this,
                               std::placeholders::_1, std::placeholders::_2);
@@ -73,14 +75,14 @@ void FullyConnectedLayer::setFunctions(const std::string& cost_func,
 }
 
 // Calculate outputs method
-std::pair<std::vector<double>, std::vector<double> >
+std::pair<std::vector<double>, std::vector<double>>
 FullyConnectedLayer::calculateOutputs(const std::vector<double>& inputs) {
   std::vector<double> outputs(num_out_nodes, 0.0);
 
   // Calculate the dot product of inputs and weights, then add biases
   for (int i = 0; i < num_out_nodes; ++i) {
     for (int j = 0; j < num_in_nodes; ++j) {
-      outputs[i] += weights[i][j] * inputs[j];
+      outputs[i] += inputs[j] * weights[j][i];
     }
     outputs[i] += biases[i];
   }

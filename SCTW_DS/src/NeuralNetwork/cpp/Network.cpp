@@ -2,12 +2,19 @@
 
 #include <algorithm>
 #include <cmath>
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include "../misc/ProgressBar.cpp"
+
+volatile sig_atomic_t stop_training = 0;
+
+void handle_signal(int signal) { stop_training = 1; }
 
 NeuralNetwork::NeuralNetwork(const std::vector<FullyConnectedLayer>& layers)
     : layers(layers) {
@@ -21,18 +28,27 @@ NeuralNetwork::NeuralNetwork(const std::vector<FullyConnectedLayer>& layers)
 }
 
 std::vector<double> NeuralNetwork::calculateOutputs(
-    const std::vector<double>& inputs) {
-  std::vector<double> activations = inputs;
+    const std::vector<double>& input) {
+  std::vector<double> activations = input;
   for (auto& layer : layers) {
     activations = layer.calculateOutputs(activations).second;
   }
   return activations;
 }
 
-int NeuralNetwork::classify(const std::vector<double>& inputs) {
-  std::vector<double> outputs = calculateOutputs(inputs);
-  return std::distance(outputs.begin(),
-                       std::max_element(outputs.begin(), outputs.end()));
+double NeuralNetwork::classify(const std::vector<double>& input) {
+  std::vector<double> outputs = calculateOutputs(input);
+  return static_cast<double>(std::distance(
+      outputs.begin(), std::max_element(outputs.begin(), outputs.end())));
+}
+
+std::vector<double> NeuralNetwork::classifyAll(
+    const std::vector<std::vector<double>>& inputs) {
+  std::vector<double> outputs(inputs.size());
+  for (int i = 0; i < inputs.size(); ++i) {
+    outputs[i] = classify(inputs[i]);
+  }
+  return outputs;
 }
 
 double NeuralNetwork::cost(
@@ -80,37 +96,35 @@ void NeuralNetwork::learn(
       std::vector<std::vector<double>> zs;
 
       for (auto& layer : layers) {
-        std::pair<std::vector<double>, std::vector<double>> res =
-            layer.calculateOutputs(activation);
-        std::vector<double> z = res.first;
-        std::vector<double> activation = res.second;
+        auto res = layer.calculateOutputs(activation);
+        auto z = res.first;
+        activation = res.second;
         zs.push_back(z);
         activations.push_back(activation);
       }
 
       // Backward pass
-      std::vector<double> delta =
-          layers.back().derivativeActivationFunction(zs.back());
+      auto delta = layers.back().derivativeCostFunction(data_point.second,
+                                                        activations.back());
       for (size_t i = 0; i < delta.size(); ++i) {
-        delta[i] *= layers.back().derivativeCostFunction(activations.back(),
-                                                         data_point.second)[i];
+        delta[i] *= layers.back().derivativeActivationFunction(zs.back())[i];
       }
 
       nabla_b.back() = delta;
       for (size_t i = 0; i < delta.size(); ++i) {
         for (size_t j = 0; j < activations[activations.size() - 2].size();
              ++j) {
-          nabla_w.back()[i][j] =
+          nabla_w.back()[j][i] +=
               activations[activations.size() - 2][j] * delta[i];
         }
       }
 
       for (int l = layers.size() - 2; l >= 0; --l) {
-        std::vector<double> sp = layers[l].derivativeActivationFunction(zs[l]);
+        auto sp = layers[l].derivativeActivationFunction(zs[l]);
         std::vector<double> new_delta(layers[l].biases.size(), 0.0);
         for (size_t i = 0; i < new_delta.size(); ++i) {
           for (size_t j = 0; j < delta.size(); ++j) {
-            new_delta[i] += delta[j] * layers[l + 1].weights[j][i];
+            new_delta[i] += delta[j] * layers[l + 1].weights[i][j];
           }
           new_delta[i] *= sp[i];
         }
@@ -118,7 +132,7 @@ void NeuralNetwork::learn(
         nabla_b[l] = delta;
         for (size_t i = 0; i < delta.size(); ++i) {
           for (size_t j = 0; j < activations[l].size(); ++j) {
-            nabla_w[l][i][j] = activations[l][j] * delta[i];
+            nabla_w[l][j][i] += activations[l][j] * delta[i];
           }
         }
       }
@@ -158,13 +172,18 @@ std::vector<double> NeuralNetwork::train(
     const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
         data_points,
     double learning_rate, int batch_size, double momentum) {
+  std::signal(SIGINT, handle_signal);
+
   std::vector<double> costs;
+  ProgressBar p = ProgressBar(iterations);
   for (int i = 0; i < iterations; ++i) {
+    if (stop_training) {
+      break;
+    }
     learn(data_points, learning_rate, batch_size, momentum);
     double cost = this->cost(data_points);
     costs.push_back(cost);
-    std::cout << "Iteration " << i + 1 << "/" << iterations << " cost: " << cost
-              << std::endl;
+    p.increment(1, cost);
   }
   return costs;
 }

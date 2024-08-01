@@ -1,17 +1,17 @@
 #ifndef NEURALNETWORK_H
 #define NEURALNETWORK_H
 
-#include <string>
 #include <vector>
 
-#include "Layers.h"
+#include "FullyConnectedLayer.h"
 
 class NeuralNetwork {
  public:
   NeuralNetwork(const std::vector<FullyConnectedLayer>& layers);
 
-  std::vector<double> calculateOutputs(const std::vector<double>& inputs);
-  int classify(const std::vector<double>& inputs);
+  std::vector<double> classifyAll(
+      const std::vector<std::vector<double>>& inputs);
+  std::vector<double> calculateOutputs(const std::vector<double>& input);
   double cost(
       const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
           data_points);
@@ -28,6 +28,7 @@ class NeuralNetwork {
   static NeuralNetwork loadModel(const std::string& file_path);
 
  private:
+  double classify(const std::vector<double>& input);
   std::vector<FullyConnectedLayer> layers;
   std::vector<std::vector<std::vector<double>>> velocity_w;
   std::vector<std::vector<double>> velocity_b;
