@@ -48,11 +48,13 @@ double NeuralNetwork::classify(const VectorXd& inputs) {
       std::max_element(outputs.data(), outputs.data() + outputs.size())));
 }
 
-VectorXd NeuralNetwork::classifyAll(const std::vector<VectorXd>& inputs) {
+VectorXd NeuralNetwork::classifyAll(
+    const std::vector<std::vector<double>>& inputs) {
   VectorXd y_pred(inputs.size());
 #pragma omp parallel for
   for (int i = 0; i < inputs.size(); ++i) {
-    y_pred[i] = classify(inputs[i]);
+    VectorXd eigen_input = VectorXd::Map(inputs[i].data(), inputs[i].size());
+    y_pred[i] = classify(eigen_input);
   }
   return y_pred;
 }
@@ -150,8 +152,18 @@ void NeuralNetwork::learn(
 
 std::vector<double> NeuralNetwork::train(
     int iterations,
-    const std::vector<std::pair<VectorXd, VectorXd>>& data_points,
+    const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
+        data_points,
     double learning_rate, int batch_size, double momentum) {
+  // Convert std::vector<std::pair<std::vector<double>, std::vector<double>>> to
+  // std::vector<std::pair<VectorXd, VectorXd>>
+  std::vector<std::pair<VectorXd, VectorXd>> eigen_data_points;
+  for (const auto& dp : data_points) {
+    VectorXd input = VectorXd::Map(dp.first.data(), dp.first.size());
+    VectorXd output = VectorXd::Map(dp.second.data(), dp.second.size());
+    eigen_data_points.emplace_back(input, output);
+  }
+
   std::vector<double> costs;
   std::signal(SIGINT, handle_signal);
   ProgressBar p = ProgressBar(iterations);
@@ -160,8 +172,8 @@ std::vector<double> NeuralNetwork::train(
     if (stop_training) {
       break;
     }
-    learn(data_points, learning_rate, batch_size, momentum);
-    double cost = this->cost(data_points);
+    learn(eigen_data_points, learning_rate, batch_size, momentum);
+    double cost = this->cost(eigen_data_points);
     costs.push_back(cost);
     p.increment(1, cost);
   }

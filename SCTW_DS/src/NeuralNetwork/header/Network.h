@@ -10,7 +10,7 @@ class NeuralNetwork {
  public:
   NeuralNetwork(const std::vector<FullyConnectedLayer>& layers);
 
-  Eigen::VectorXd classifyAll(const std::vector<Eigen::VectorXd>& inputs);
+  Eigen::VectorXd classifyAll(const std::vector<std::vector<double>>& inputs);
   Eigen::VectorXd calculateOutputs(const Eigen::VectorXd& input);
   double cost(const std::vector<std::pair<Eigen::VectorXd, Eigen::VectorXd>>&
                   data_points);
@@ -19,7 +19,7 @@ class NeuralNetwork {
              double learning_rate, int batch_size, double momentum);
   std::vector<double> train(
       int iterations,
-      const std::vector<std::pair<Eigen::VectorXd, Eigen::VectorXd>>&
+      const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
           data_points,
       double learning_rate, int batch_size, double momentum);
   void saveModel(const std::string& file_path);

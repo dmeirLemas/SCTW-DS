@@ -78,7 +78,7 @@ void FullyConnectedLayer::setFunctions(const std::string& cost_func,
 // Calculate outputs method
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 FullyConnectedLayer::calculateOutputs(const Eigen::VectorXd& inputs) {
-  Eigen::VectorXd z = weights.transpose() * inputs + biases;
+  Eigen::VectorXd z = inputs * weights.transpose() + biases;
   Eigen::VectorXd activation = activationFunction(z);
   return {z, activation};
 }
