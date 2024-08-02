@@ -21,7 +21,6 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
       std::bind(&FullyConnectedLayer::cross_entropy, this,
                 std::placeholders::_1, std::placeholders::_2);
 
-  // Initialize activation_map
   activation_map["sigmoid"] =
       std::bind(&FullyConnectedLayer::sigmoid, this, std::placeholders::_1);
   activation_map["relu"] =
@@ -33,7 +32,6 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
   activation_map["softmax"] =
       std::bind(&FullyConnectedLayer::softmax, this, std::placeholders::_1);
 
-  // Initialize cost_derivative_map
   cost_derivative_map["mse"] =
       std::bind(&FullyConnectedLayer::mseDerivative, this,
                 std::placeholders::_1, std::placeholders::_2);
@@ -41,7 +39,6 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
       std::bind(&FullyConnectedLayer::cross_entropyDerivative, this,
                 std::placeholders::_1, std::placeholders::_2);
 
-  // Initialize derivative_map
   activation_derivative_map["sigmoid"] = std::bind(
       &FullyConnectedLayer::sigmoid_derivative, this, std::placeholders::_1);
   activation_derivative_map["relu"] = std::bind(
@@ -53,7 +50,6 @@ FullyConnectedLayer::FullyConnectedLayer(int in_nodes, int out_nodes,
   activation_derivative_map["softmax"] = std::bind(
       &FullyConnectedLayer::softmax_derivative, this, std::placeholders::_1);
 
-  // Set Functions
   setFunctions(cost_func, activation_func);
 }
 
@@ -78,8 +74,9 @@ void FullyConnectedLayer::setFunctions(const std::string& cost_func,
 // Calculate outputs method
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 FullyConnectedLayer::calculateOutputs(const Eigen::VectorXd& inputs) {
-  Eigen::VectorXd z = inputs * weights.transpose() + biases;
+  Eigen::VectorXd z = (inputs.transpose() * weights) + biases.transpose();
   Eigen::VectorXd activation = activationFunction(z);
+
   return {z, activation};
 }
 

@@ -10,7 +10,6 @@
 #include <numeric>
 #include <stdexcept>
 #include <utility>
-#include <vector>
 
 #include "../misc/ProgressBar.cpp"
 
@@ -121,13 +120,18 @@ void NeuralNetwork::learn(
       nabla_b.back() = delta;
       nabla_w.back() = activations[activations.size() - 2] * delta.transpose();
 
-      for (int l = layers.size() - 2; l >= 0; --l) {
-        auto sp = layers[l].derivativeActivationFunction(zs[l]);
+      for (int l = 2; l < layers.size() + 1; ++l) {
+        auto sp = layers[-l + layers.size()].derivativeActivationFunction(
+            zs[-l + zs.size()]);
+
         VectorXd new_delta =
-            (layers[l + 1].weights.transpose() * delta).cwiseProduct(sp);
+            (delta.transpose() *
+             layers[-l + layers.size() + 1].weights.transpose())
+                .cwiseProduct(sp.transpose());
         delta = new_delta;
-        nabla_b[l] = delta;
-        nabla_w[l] = activations[l] * delta.transpose();
+        nabla_b[-l + nabla_b.size()] = delta;
+        nabla_w[-l + nabla_w.size()] =
+            activations[-l + activations.size() - 1] * delta.transpose();
       }
     }
 
