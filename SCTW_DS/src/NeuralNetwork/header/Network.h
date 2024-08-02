@@ -1,6 +1,8 @@
 #ifndef NEURALNETWORK_H
 #define NEURALNETWORK_H
 
+#include <vector>
+
 #include "../../Eigen/Dense"
 #include "FullyConnectedLayer.h"
 
@@ -8,7 +10,8 @@ class NeuralNetwork {
  public:
   NeuralNetwork(const std::vector<FullyConnectedLayer>& layers);
 
-  Eigen::VectorXd classifyAll(const std::vector<std::vector<double>>& inputs);
+  std::vector<double> classifyAll(
+      const std::vector<std::vector<double>>& inputs);
   Eigen::VectorXd calculateOutputs(const Eigen::VectorXd& input);
   double cost(const std::vector<std::pair<Eigen::VectorXd, Eigen::VectorXd>>&
                   data_points);

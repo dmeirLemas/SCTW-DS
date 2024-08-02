@@ -10,6 +10,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 #include "../misc/ProgressBar.cpp"
 
@@ -47,9 +48,9 @@ double NeuralNetwork::classify(const VectorXd& inputs) {
       std::max_element(outputs.data(), outputs.data() + outputs.size())));
 }
 
-VectorXd NeuralNetwork::classifyAll(
+std::vector<double> NeuralNetwork::classifyAll(
     const std::vector<std::vector<double>>& inputs) {
-  VectorXd y_pred(inputs.size());
+  std::vector<double> y_pred(inputs.size());
 #pragma omp parallel for
   for (int i = 0; i < inputs.size(); ++i) {
     VectorXd eigen_input = VectorXd::Map(inputs[i].data(), inputs[i].size());
