@@ -1,6 +1,6 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -14,29 +14,31 @@ def process_chunk(
     p: ProgressBar,
     lock: threading.Lock,
     num_out_classes: int,
-) -> np.ndarray:
+) -> List[Tuple[List[float], List[float]]]:
     data_points = []
     for _, row in df_chunk.iterrows():
-        inputs = [row[cols[j]] for j in range(len(cols) - 1)]
+        inputs = [float(row[cols[j]]) for j in range(len(cols) - 1)]
         output = row[cols[-1]]
         expected_outputs = [0.0] * num_out_classes
         expected_outputs[int(output)] = 1.0
         data_points.append(
             (
-                np.array(inputs, dtype=np.float64),
-                np.array(expected_outputs, dtype=np.float64),
+                inputs,
+                expected_outputs,
             )
         )
+
         with lock:
             p.increment()
 
-    data_points = np.array(data_points, dtype=object)
     return data_points
 
 
 def trainTestSplit(
     df: pd.DataFrame, num_out_classes: int, ratio: float = 0.8, num_threads: int = 4
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[
+    List[Tuple[List[float], List[float]]], List[Tuple[List[float], List[float]]]
+]:
     data_points = []
     cols = df.columns
     p = ProgressBar(total=len(df), program_name="PAIN")
@@ -58,10 +60,25 @@ def trainTestSplit(
     test_data = data_points[int(ratio * len(data_points)) :]
 
     for i in range(len(test_data)):
-        # Flatten the expected_outputs for test data and wrap in np.array
-        test_data[i] = (
-            test_data[i][0],
-            np.array(float(np.where(test_data[i][1] == 1.0)[0][0])),
-        )
+        try:
+            # Check the shape and content of expected_outputs
+            if len(test_data[i][1]) == 0 or np.sum(test_data[i][1]) == 0:
+                raise ValueError(
+                    f"Expected output array has no 1.0 value: {test_data[i][1]}"
+                )
 
-    return np.array(train_data, dtype=object), np.array(test_data, dtype=object)
+            # Ensure the expected output remains in the one-hot encoded format
+            test_data[i] = (
+                test_data[i][0],
+                test_data[i][1].index(1.0),  # Keep the one-hot encoded format
+            )
+        except IndexError as e:
+            print(
+                f"IndexError: {e} at index {i} with expected_outputs: {test_data[i][1]}"
+            )
+            raise
+        except ValueError as e:
+            print(f"ValueError: {e} at index {i}")
+            raise
+
+    return train_data, test_data

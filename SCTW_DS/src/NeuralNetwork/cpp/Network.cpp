@@ -24,12 +24,15 @@ using Eigen::VectorXd;
 
 NeuralNetwork::NeuralNetwork(const std::vector<FullyConnectedLayer>& layers)
     : layers(layers) {
-  velocity_w.resize(layers.size());
-  velocity_b.resize(layers.size());
+  m_w.resize(layers.size());
+  v_w.resize(layers.size());
+  m_b.resize(layers.size());
+  v_b.resize(layers.size());
   for (size_t i = 0; i < layers.size(); ++i) {
-    velocity_w[i] =
-        MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
-    velocity_b[i] = VectorXd::Zero(layers[i].biases.size());
+    m_w[i] = MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
+    v_w[i] = MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
+    m_b[i] = VectorXd::Zero(layers[i].biases.size());
+    v_b[i] = VectorXd::Zero(layers[i].biases.size());
   }
 }
 
@@ -74,7 +77,8 @@ double NeuralNetwork::cost(
 
 void NeuralNetwork::learn(
     const std::vector<std::pair<VectorXd, VectorXd>>& training_data,
-    double learning_rate, int batch_size, double momentum) {
+    double learning_rate, int batch_size, double beta1, double beta2,
+    double epsilon) {
   std::vector<MatrixXd> nabla_w_total(layers.size());
   std::vector<VectorXd> nabla_b_total(layers.size());
 
@@ -124,7 +128,6 @@ void NeuralNetwork::learn(
       for (int l = 2; l < layers.size() + 1; ++l) {
         auto sp = layers[-l + layers.size()].derivativeActivationFunction(
             zs[-l + zs.size()]);
-
         VectorXd new_delta =
             (delta.transpose() *
              layers[-l + layers.size() + 1].weights.transpose())
@@ -146,12 +149,27 @@ void NeuralNetwork::learn(
   }
 
   for (size_t i = 0; i < layers.size(); ++i) {
-    velocity_b[i] = momentum * velocity_b[i] -
-                    (learning_rate / batch_size) * nabla_b_total[i];
-    layers[i].biases += velocity_b[i];
-    velocity_w[i] = momentum * velocity_w[i] -
-                    (learning_rate / batch_size) * nabla_w_total[i];
-    layers[i].weights += velocity_w[i];
+    m_b[i] = beta1 * m_b[i] + (1 - beta1) * nabla_b_total[i];
+    v_b[i] = beta2 * v_b[i] +
+             (1 - beta2) * nabla_b_total[i].cwiseProduct(nabla_b_total[i]);
+
+    VectorXd m_b_hat = m_b[i] / (1 - std::pow(beta1, batch_size));
+    VectorXd v_b_hat = v_b[i] / (1 - std::pow(beta2, batch_size));
+
+    layers[i].biases -=
+        learning_rate *
+        m_b_hat.cwiseQuotient((v_b_hat.array().sqrt() + epsilon).matrix());
+
+    m_w[i] = beta1 * m_w[i] + (1 - beta1) * nabla_w_total[i];
+    v_w[i] = beta2 * v_w[i] +
+             (1 - beta2) * nabla_w_total[i].cwiseProduct(nabla_w_total[i]);
+
+    MatrixXd m_w_hat = m_w[i] / (1 - std::pow(beta1, batch_size));
+    MatrixXd v_w_hat = v_w[i] / (1 - std::pow(beta2, batch_size));
+
+    layers[i].weights -=
+        learning_rate *
+        m_w_hat.cwiseQuotient((v_w_hat.array().sqrt() + epsilon).matrix());
   }
 }
 
@@ -159,9 +177,8 @@ std::vector<double> NeuralNetwork::train(
     int iterations,
     const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
         data_points,
-    double learning_rate, int batch_size, double momentum) {
-  // Convert std::vector<std::pair<std::vector<double>, std::vector<double>>> to
-  // std::vector<std::pair<VectorXd, VectorXd>>
+    double learning_rate, int batch_size, double beta1 = 0.9,
+    double beta2 = 0.999, double epsilon = 1e-8) {
   std::vector<std::pair<VectorXd, VectorXd>> eigen_data_points;
   for (const auto& dp : data_points) {
     VectorXd input = VectorXd::Map(dp.first.data(), dp.first.size());
@@ -170,26 +187,24 @@ std::vector<double> NeuralNetwork::train(
   }
 
   std::vector<double> costs;
-
   std::signal(SIGINT, handle_signal);
-
   ProgressBar p = ProgressBar(iterations);
-  const int progress_update_interval = 10;
-
   double cost;
+
+  const int interval = 1;
 
   for (int i = 0; i < iterations; ++i) {
     if (stop_training) {
       break;
     }
-    learn(eigen_data_points, learning_rate, batch_size, momentum);
+    learn(eigen_data_points, learning_rate, batch_size, beta1, beta2, epsilon);
     cost = this->cost(eigen_data_points);
     costs.push_back(cost);
-    if (i % progress_update_interval == 0) {
-      p.increment(progress_update_interval, cost);
+    if (i % interval == 0 && i > 0) {
+      p.increment(interval, cost);
     }
   }
-  p.increment(progress_update_interval, cost);
+  p.increment(interval, cost);
   return costs;
 }
 
