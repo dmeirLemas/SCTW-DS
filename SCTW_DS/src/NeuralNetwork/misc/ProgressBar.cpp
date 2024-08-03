@@ -37,6 +37,11 @@ class ProgressBar {
 
     cout << completed << "Progress: [" << arrow << padding << "] "
          << fraction * 100 << "%" << " Cost: " << cost << ending;
+
+    if (current == total) {
+      cout << std::endl;  // Ensure the final message is printed on a new line
+    }
+    cout.flush();  // Flush the stream to ensure immediate output
   }
 
   void increment(int step = 1, double cost = 0.0) {

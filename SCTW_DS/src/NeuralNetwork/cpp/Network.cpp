@@ -170,18 +170,26 @@ std::vector<double> NeuralNetwork::train(
   }
 
   std::vector<double> costs;
+
   std::signal(SIGINT, handle_signal);
+
   ProgressBar p = ProgressBar(iterations);
+  const int progress_update_interval = 10;
+
+  double cost;
 
   for (int i = 0; i < iterations; ++i) {
     if (stop_training) {
       break;
     }
     learn(eigen_data_points, learning_rate, batch_size, momentum);
-    double cost = this->cost(eigen_data_points);
+    cost = this->cost(eigen_data_points);
     costs.push_back(cost);
-    p.increment(1, cost);
+    if (i % progress_update_interval == 0) {
+      p.increment(progress_update_interval, cost);
+    }
   }
+  p.increment(progress_update_interval, cost);
   return costs;
 }
 
