@@ -44,7 +44,7 @@ def generateDataset(
     df = generate_data()
 
     # Determine the required size
-    required_size = x_func_params[0][2]
+    required_size = x_func_params[0][-1]
 
     if balance_dataset:
         balanced_df = balance_classes(df, "y_col")
