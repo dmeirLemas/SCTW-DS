@@ -39,6 +39,9 @@ def trainTestSplit(
 ) -> Tuple[
     List[Tuple[List[float], List[float]]], List[Tuple[List[float], List[float]]]
 ]:
+    # Shuffle the DataFrame
+    df = df.sample(frac=1).reset_index(drop=True)
+
     data_points = []
     cols = df.columns
     p = ProgressBar(total=len(df), program_name="PAIN")

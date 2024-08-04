@@ -23,16 +23,23 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
 NeuralNetwork::NeuralNetwork(const std::vector<FullyConnectedLayer>& layers)
-    : layers(layers) {
+    : layers(layers), beta1(0.9), beta2(0.999), epsilon(1e-8), iterations(0) {
+  velocity_w.resize(layers.size());
+  velocity_b.resize(layers.size());
   m_w.resize(layers.size());
   v_w.resize(layers.size());
   m_b.resize(layers.size());
   v_b.resize(layers.size());
   for (size_t i = 0; i < layers.size(); ++i) {
-    m_w[i] = MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
-    v_w[i] = MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
-    m_b[i] = VectorXd::Zero(layers[i].biases.size());
-    v_b[i] = VectorXd::Zero(layers[i].biases.size());
+    velocity_w[i] = Eigen::MatrixXd::Zero(layers[i].weights.rows(),
+                                          layers[i].weights.cols());
+    velocity_b[i] = Eigen::VectorXd::Zero(layers[i].biases.size());
+    m_w[i] = Eigen::MatrixXd::Zero(layers[i].weights.rows(),
+                                   layers[i].weights.cols());
+    v_w[i] = Eigen::MatrixXd::Zero(layers[i].weights.rows(),
+                                   layers[i].weights.cols());
+    m_b[i] = Eigen::VectorXd::Zero(layers[i].biases.size());
+    v_b[i] = Eigen::VectorXd::Zero(layers[i].biases.size());
   }
 }
 
@@ -76,36 +83,36 @@ double NeuralNetwork::cost(
 }
 
 void NeuralNetwork::learn(
-    const std::vector<std::pair<VectorXd, VectorXd>>& training_data,
-    double learning_rate, int batch_size, double beta1, double beta2,
-    double epsilon) {
-  std::vector<MatrixXd> nabla_w_total(layers.size());
-  std::vector<VectorXd> nabla_b_total(layers.size());
+    const std::vector<std::pair<Eigen::VectorXd, Eigen::VectorXd>>&
+        training_data,
+    double learning_rate, int batch_size) {
+  std::vector<Eigen::MatrixXd> nabla_w_total(layers.size());
+  std::vector<Eigen::VectorXd> nabla_b_total(layers.size());
 
   for (size_t i = 0; i < layers.size(); ++i) {
-    nabla_w_total[i] =
-        MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
-    nabla_b_total[i] = VectorXd::Zero(layers[i].biases.size());
+    nabla_w_total[i] = Eigen::MatrixXd::Zero(layers[i].weights.rows(),
+                                             layers[i].weights.cols());
+    nabla_b_total[i] = Eigen::VectorXd::Zero(layers[i].biases.size());
   }
 
 #pragma omp parallel for
   for (size_t k = 0; k < training_data.size(); k += batch_size) {
-    std::vector<MatrixXd> nabla_w(layers.size());
-    std::vector<VectorXd> nabla_b(layers.size());
+    std::vector<Eigen::MatrixXd> nabla_w(layers.size());
+    std::vector<Eigen::VectorXd> nabla_b(layers.size());
 
     for (size_t i = 0; i < layers.size(); ++i) {
-      nabla_w[i] =
-          MatrixXd::Zero(layers[i].weights.rows(), layers[i].weights.cols());
-      nabla_b[i] = VectorXd::Zero(layers[i].biases.size());
+      nabla_w[i] = Eigen::MatrixXd::Zero(layers[i].weights.rows(),
+                                         layers[i].weights.cols());
+      nabla_b[i] = Eigen::VectorXd::Zero(layers[i].biases.size());
     }
 
     for (size_t b = 0; b < batch_size && (k + b) < training_data.size(); ++b) {
       const auto& data_point = training_data[k + b];
 
       // Forward pass
-      VectorXd activation = data_point.first;
-      std::vector<VectorXd> activations = {activation};
-      std::vector<VectorXd> zs;
+      Eigen::VectorXd activation = data_point.first;
+      std::vector<Eigen::VectorXd> activations = {activation};
+      std::vector<Eigen::VectorXd> zs;
 
       for (auto& layer : layers) {
         auto res = layer.calculateOutputs(activation);
@@ -128,7 +135,8 @@ void NeuralNetwork::learn(
       for (int l = 2; l < layers.size() + 1; ++l) {
         auto sp = layers[-l + layers.size()].derivativeActivationFunction(
             zs[-l + zs.size()]);
-        VectorXd new_delta =
+
+        Eigen::VectorXd new_delta =
             (delta.transpose() *
              layers[-l + layers.size() + 1].weights.transpose())
                 .cwiseProduct(sp.transpose());
@@ -149,27 +157,26 @@ void NeuralNetwork::learn(
   }
 
   for (size_t i = 0; i < layers.size(); ++i) {
-    m_b[i] = beta1 * m_b[i] + (1 - beta1) * nabla_b_total[i];
-    v_b[i] = beta2 * v_b[i] +
-             (1 - beta2) * nabla_b_total[i].cwiseProduct(nabla_b_total[i]);
-
-    VectorXd m_b_hat = m_b[i] / (1 - std::pow(beta1, batch_size));
-    VectorXd v_b_hat = v_b[i] / (1 - std::pow(beta2, batch_size));
-
-    layers[i].biases -=
-        learning_rate *
-        m_b_hat.cwiseQuotient((v_b_hat.array().sqrt() + epsilon).matrix());
-
     m_w[i] = beta1 * m_w[i] + (1 - beta1) * nabla_w_total[i];
     v_w[i] = beta2 * v_w[i] +
              (1 - beta2) * nabla_w_total[i].cwiseProduct(nabla_w_total[i]);
+    Eigen::MatrixXd m_hat_w = m_w[i] / (1 - std::pow(beta1, iterations));
+    Eigen::MatrixXd v_hat_w = v_w[i] / (1 - std::pow(beta2, iterations));
 
-    MatrixXd m_w_hat = m_w[i] / (1 - std::pow(beta1, batch_size));
-    MatrixXd v_w_hat = v_w[i] / (1 - std::pow(beta2, batch_size));
+    m_b[i] = beta1 * m_b[i] + (1 - beta1) * nabla_b_total[i];
+    v_b[i] = beta2 * v_b[i] +
+             (1 - beta2) * nabla_b_total[i].cwiseProduct(nabla_b_total[i]);
+    Eigen::VectorXd m_hat_b = m_b[i] / (1 - std::pow(beta1, iterations));
+    Eigen::VectorXd v_hat_b = v_b[i] / (1 - std::pow(beta2, iterations));
 
     layers[i].weights -=
-        learning_rate *
-        m_w_hat.cwiseQuotient((v_w_hat.array().sqrt() + epsilon).matrix());
+        learning_rate * m_hat_w.array()
+                            .cwiseQuotient(v_hat_w.array().sqrt() + epsilon)
+                            .matrix();
+    layers[i].biases -=
+        learning_rate * m_hat_b.array()
+                            .cwiseQuotient(v_hat_b.array().sqrt() + epsilon)
+                            .matrix();
   }
 }
 
@@ -177,8 +184,9 @@ std::vector<double> NeuralNetwork::train(
     int iterations,
     const std::vector<std::pair<std::vector<double>, std::vector<double>>>&
         data_points,
-    double learning_rate, int batch_size, double beta1 = 0.9,
-    double beta2 = 0.999, double epsilon = 1e-8) {
+    double learning_rate, int batch_size) {
+  // Convert std::vector<std::pair<std::vector<double>, std::vector<double>>> to
+  // std::vector<std::pair<VectorXd, VectorXd>>
   std::vector<std::pair<VectorXd, VectorXd>> eigen_data_points;
   for (const auto& dp : data_points) {
     VectorXd input = VectorXd::Map(dp.first.data(), dp.first.size());
@@ -189,22 +197,21 @@ std::vector<double> NeuralNetwork::train(
   std::vector<double> costs;
   std::signal(SIGINT, handle_signal);
   ProgressBar p = ProgressBar(iterations);
+  const int interval = iterations / 10;
   double cost;
 
-  const int interval = 1;
-
-  for (int i = 0; i < iterations; ++i) {
+  for (int i = 1; i <= iterations; ++i) {
     if (stop_training) {
       break;
     }
-    learn(eigen_data_points, learning_rate, batch_size, beta1, beta2, epsilon);
+    this->iterations = i;
+    learn(eigen_data_points, learning_rate, batch_size);
     cost = this->cost(eigen_data_points);
     costs.push_back(cost);
-    if (i % interval == 0 && i > 0) {
+    if (i % interval == 0) {
       p.increment(interval, cost);
     }
   }
-  p.increment(interval, cost);
   return costs;
 }
 
